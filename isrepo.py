@@ -6,7 +6,7 @@ Print the status/revision of the current repository.
 
 Used for my custom prompt.
 
-Code courtesy of Stefan Majewsky.
+Most code courtesy of Stefan Majewsky.
 """
 
 # code borrowed by S. Majewsky, tanks a lot!
@@ -83,8 +83,25 @@ def recognizeGitRepo(path):
         branchSpec = branchSpec + " before initial commit"
         extraInfo = "%s"%(branchSpec)
     else:
-        extraInfo = "%s@%s"%(branchSpec, commit[0:6])
+        extraInfo = "%s@%s"%(branchSpec, commit[0:6]) + GitIsDirtyString(path)
+
     return basePath, subPath, extraInfo
+
+
+def GitIsDirtyString(path):
+    """Return '*' if the working directory is a dirty git repository, '' else.
+    """
+
+    try:
+        proc = sp.Popen(["git", "diff-files", "--quiet"], cwd=path, stdout=sp.PIPE,
+                        stderr=sp.PIPE)
+    except OSError:
+        result = ""
+    else:
+        proc.wait()
+        result = "*" if proc.returncode == 1 else ""
+
+    return result
 
 
 def recognizeSvnRepo(path):
