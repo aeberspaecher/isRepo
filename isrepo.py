@@ -19,7 +19,7 @@ import sys
 import subprocess as sp
 
 
-def catFile(fileName):
+def cat_file(fileName):
     """ Returns the content of the given file. No exception handling.
     """
 
@@ -33,7 +33,7 @@ class NotARepoException(Exception):
     pass
 
 
-def recognizeGitRepo(path):
+def recognize_git_repo(path):
     """Returns a triple of repo path, path in repo, and repo status.
     E.g. ("/foo", "bar", "on branch master at 631d7a2") for
     path == "/foo/bar" and os.path.exists("/foo/.git").
@@ -41,54 +41,54 @@ def recognizeGitRepo(path):
     Throws NotARepoException if .git cannot be found.
     """
 
-    basePath = op.realpath(path)
-    subPath = ""
+    base_path = op.realpath(path)
+    sub_path = ""
     # find Git repo
-    while not op.exists(op.join(basePath, ".git")):
+    while not op.exists(op.join(base_path, ".git")):
         # ascend in directory hierarchy if possible
-        basePath, newSubDir = op.split(basePath)
-        subPath = op.join(newSubDir, subPath)
+        base_path, new_sub_dir = op.split(base_path)
+        sub_path = op.join(new_sub_dir, sub_path)
         # root directory reached? -> not in Git repo
-        if newSubDir == "":
+        if new_sub_dir == "":
             raise NotARepoException
 
     # determine current branch and commit
-    gitDir = op.join(basePath, ".git")
-    headRef = catFile(op.join(gitDir, "HEAD")).strip()
-    if headRef.startswith("ref: refs/"):
-        refSpec = headRef[5:]
-        headRef2 = headRef[10:]
-        if headRef2.startswith("heads/"):
+    git_dir = op.join(base_path, ".git")
+    head_ref = cat_file(op.join(git_dir, "HEAD")).strip()
+    if head_ref.startswith("ref: refs/"):
+        refSpec = head_ref[5:]
+        head_ref2 = head_ref[10:]
+        if head_ref2.startswith("heads/"):
             # current HEAD is a branch
-            branch = headRef2[6:]
+            branch = head_ref2[6:]
         else:
             # current HEAD is a remote or tag -> include type specification
-            branch = headRef2
-        branchSpec = branch
+            branch = head_ref2
+        branch_spec = branch
         # read corresponding file to find commit
-        commit = catFile(op.join(gitDir, refSpec)).strip()
-        if commit == "" and op.exists(op.join(gitDir, "packed-refs")):
-            packedRefs = open(op.join(gitDir, "packed-refs")).readlines()
-            packedRefs = map(str.strip, packedRefs)
-            for packedRef in packedRefs:
-                if packedRef.endswith(refSpec):
-                    commit = packedRef[0:40]
+        commit = cat_file(op.join(git_dir, refSpec)).strip()
+        if commit == "" and op.exists(op.join(git_dir, "packed-refs")):
+            packed_refs = open(op.join(git_dir, "packed-refs")).readlines()
+            packed_refs = [ref.strip() for ref in packed_refs]
+            for packed_ref in packed_refs:
+                if packed_ref.endswith(refSpec):
+                    commit = packed_ref[0:40]
                     break
     else:
         # current HEAD is detached
-        branchSpec = "no branch"
-        commit = headRef
+        branch_spec = "no branch"
+        commit = head_ref
 
     if commit == "":  # before initial commit
-        branchSpec = branchSpec + " before initial commit"
-        extraInfo = "%s"%(branchSpec)
+        branch_spec = branch_spec + " before initial commit"
+        extraInfo = "%s"%(branch_spec)
     else:
-        extraInfo = "%s@%s"%(branchSpec, commit[0:6]) + GitIsDirtyString(path)
+        extraInfo = "%s@%s"%(branch_spec, commit[0:6]) + git_is_dirty_string(path)
 
-    return basePath, subPath, extraInfo
+    return base_path, sub_path, extraInfo
 
 
-def GitIsDirtyString(path):
+def git_is_dirty_string(path):
     """Return '*' if the working directory is a dirty git repository, '' else.
     """
 
@@ -104,40 +104,43 @@ def GitIsDirtyString(path):
     return result
 
 
-def recognizeSvnRepo(path):
-    """Like recognizeGitRepo, but for SVN repos. Repo status message looks like
+def recognize_svn_repo(path):
+    """Like recognize_git_repo, but for SVN repos. Repo status message looks like
     "on revision 42".
 
     Throws NotARepoException if .svn cannot be found.
     """
-    basePath = op.realpath(path)
-    subPath = ""
+
+    base_path = op.realpath(path)
+    sub_path = ""
     # find SVN repo
-    if not op.exists(op.join(basePath, ".svn")):
+    if not op.exists(op.join(base_path, ".svn")):
         raise NotARepoException
-    while op.exists(op.join(op.dirname(basePath), ".svn")):
+    while op.exists(op.join(op.dirname(base_path), ".svn")):
         # ascend in directory hierarchy as far as possible
-        basePath, newSubDir = op.split(basePath)
-        subPath = op.join(newSubDir, subPath)
+        base_path, new_sub_dir = op.split(base_path)
+        sub_path = op.join(new_sub_dir, sub_path)
 
     # ask `svn info` for revision
-    svnInfoOutput = sp.Popen(["svn", "info"], cwd=path,
-                             stdout=sp.PIPE).communicate()[0]
-    for line in svnInfoOutput.splitlines():
+    svn_info_output = sp.Popen(["svn", "info"], cwd=path,
+                               stdout=sp.PIPE).communicate()[0]
+    for line in svn_info_output.splitlines():
         if line.startswith("Revision: "):
             revision = line[10:]
 
-    return basePath, subPath, "rev. %s" % revision
+    return base_path, sub_path, "rev. %s"%revision
+
 
 if(__name__ == '__main__'):
     try:  # is sys.argv[1] in a git repo?
-        path, repopath, status = recognizeGitRepo(sys.argv[1])
-    except:
+        path, repopath, status = recognize_git_repo(sys.argv[1])
+    except NotARepoException:
         try:  # test for svn
-            path, repopath, status = recognizeSvnRepo(sys.argv[1])
-        except:
+            path, repopath, status = recognize_svn_repo(sys.argv[1])
+        except NotARepoException:
             status = ""
 
+    # print prompt:
     if(len(status) > 0):
         print("["+ status + "] ")
     else:
