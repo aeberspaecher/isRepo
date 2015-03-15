@@ -52,6 +52,8 @@ def recognize_git_repo(path):
         if new_sub_dir == "":
             raise NotARepoException
 
+    # TODO: this approach is slow. find something faster that is able to deal with detached HEAD
+
     # determine current branch and commit
     git_dir = op.join(base_path, ".git")
     head_ref = cat_file(op.join(git_dir, "HEAD")).strip()

@@ -23,4 +23,7 @@ This will give you this amazing prompt (with colors, of course)::
 
   [master@94b08c] eberspaecher@computer ~/s/isRepo>
 
+Known issues
+------------
 
+On very large repositories, this approach is slow.
