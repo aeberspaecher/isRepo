@@ -19,12 +19,12 @@ import sys
 import subprocess as sp
 
 
-def cat_file(fileName):
+def cat_file(file_name):
     """ Returns the content of the given file. No exception handling.
     """
 
     try:
-        return "".join(open(fileName).readlines())
+        return "".join(open(file_name).readlines())
     except IOError:
         return ""
 
