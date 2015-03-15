@@ -5,18 +5,22 @@
 Print the status/revision of the current repository.
 
 Used for my custom prompt.
-
-Most code courtesy of Stefan Majewsky.
 """
 
-# code borrowed by S. Majewsky, tanks a lot!
+# git directory traversal and SVN code borrowed from S. Majewsky, tanks a lot!
 #http://quickgit.kde.org/index.php?p=scratch%2Fmajewsky%2Fdevenv.git&a=blob&h=2405b0531653d9b833a785a135e68eaf658caebf&hb=841eb992e6c8adae5e831f6d43b8d5f373d15338&f=bin%2Fprettyprompt.py
 # Link taken from his blog post at
 # http://majewsky.wordpress.com/2011/09/13/a-clear-sign-of-madness/
 
+# TODO: improve documentation
+
 import os.path as op
 import sys
 import subprocess as sp
+
+
+SHA1_length = 5  # print this many characters of SHA1 strings
+dirty_appendix = "*"
 
 
 def cat_file(file_name):
@@ -33,65 +37,78 @@ class NotARepoException(Exception):
     pass
 
 
+class CommandFailedException(Exception):
+    pass
+
+
 def recognize_git_repo(path):
-    """Returns a triple of repo path, path in repo, and repo status.
-    E.g. ("/foo", "bar", "on branch master at 631d7a2") for
-    path == "/foo/bar" and os.path.exists("/foo/.git").
+    """Returns a triple of repo path, path in repo, and repo status. E.g.
+    ("/foo", "bar", "on branch master at 631d7a2") for path == "/foo/bar" and
+    os.path.exists("/foo/.git").
 
     Throws NotARepoException if .git cannot be found.
     """
 
     base_path = op.realpath(path)
     sub_path = ""
-    # find Git repo
+    # find Git repo (resides in a .git directory)
     while not op.exists(op.join(base_path, ".git")):
-        # ascend in directory hierarchy if possible
+        # ascend in directory hierarchy if possible:
         base_path, new_sub_dir = op.split(base_path)
         sub_path = op.join(new_sub_dir, sub_path)
-        # root directory reached? -> not in Git repo
+        # root directory reached? -> not in git repo
         if new_sub_dir == "":
             raise NotARepoException
 
-    # TODO: this approach is slow. find something faster that is able to deal with detached HEAD
+    # determine current branch and commit, use git commands:
+    # get commit that HEAD points to: git rev-parse --verify HEAD
+    # find branch: git rev-parse --symbolic-full-name --abbrev-ref HEAD
+    branch = get_git_branch(path)
 
-    # determine current branch and commit
-    git_dir = op.join(base_path, ".git")
-    head_ref = cat_file(op.join(git_dir, "HEAD")).strip()
-    if head_ref.startswith("ref: refs/"):
-        refSpec = head_ref[5:]
-        head_ref2 = head_ref[10:]
-        if head_ref2.startswith("heads/"):
-            # current HEAD is a branch
-            branch = head_ref2[6:]
-        else:
-            # current HEAD is a remote or tag -> include type specification
-            branch = head_ref2
-        branch_spec = branch
-        # read corresponding file to find commit
-        commit = cat_file(op.join(git_dir, refSpec)).strip()
-        if commit == "" and op.exists(op.join(git_dir, "packed-refs")):
-            packed_refs = open(op.join(git_dir, "packed-refs")).readlines()
-            packed_refs = [ref.strip() for ref in packed_refs]
-            for packed_ref in packed_refs:
-                if packed_ref.endswith(refSpec):
-                    commit = packed_ref[0:40]
-                    break
-    else:
-        # current HEAD is detached
-        branch_spec = "no branch"
-        commit = head_ref
+    try:
+        commit = get_git_commit(path)[:SHA1_length]
+    except CommandFailedException:  # TODO: can there be other exceptions raised?
+        commit = "before initial commit"
 
-    if commit == "":  # before initial commit
-        branch_spec = branch_spec + " before initial commit"
-        extraInfo = "%s"%(branch_spec)
-    else:
-        extraInfo = "%s@%s"%(branch_spec, commit[0:6]) + git_is_dirty_string(path)
+    is_dirty_appendix = get_git_dirty_string(path, dirty_appendix)
 
-    return base_path, sub_path, extraInfo
+    status = branch + "@" + commit + is_dirty_appendix
+
+    return base_path, sub_path, status
 
 
-def git_is_dirty_string(path):
-    """Return '*' if the working directory is a dirty git repository, '' else.
+def get_git_branch(path):
+    """Find branch for the git repository in path.
+    """
+
+    try:
+        branch = sp.check_output(["git", "symbolic-ref", "HEAD"],
+                                 universal_newlines=True, cwd=path, shell=False,
+                                 stderr=sp.STDOUT)
+    except sp.CalledProcessError:
+        # interpret git returning an error exit code as not being on a branch:
+        raise CommandFailedException  # TODO: rename this exception to something git-ty
+
+    return branch.replace("\n", "").split("/")[-1]
+
+
+def get_git_commit(path):
+    """Find git commit for repository in path.
+    """
+
+    try:
+        commit = sp.check_output(["git", "rev-parse", "--verify", "HEAD"],
+                                 universal_newlines=True, cwd=path, shell=False,
+                                 stderr=sp.STDOUT)
+    except sp.CalledProcessError:
+        raise CommandFailedException
+
+    return commit.replace("\n", "")
+
+
+def get_git_dirty_string(path, dirty_appendix="*"):
+    """Return '*' if the working directory is a 'dirty' git repository, ''
+    else.
     """
 
     try:
@@ -101,14 +118,14 @@ def git_is_dirty_string(path):
         result = ""
     else:
         proc.wait()
-        result = "*" if proc.returncode == 1 else ""
+        result = dirty_appendix if proc.returncode == 1 else ""
 
     return result
 
 
 def recognize_svn_repo(path):
-    """Like recognize_git_repo, but for SVN repos. Repo status message looks like
-    "on revision 42".
+    """Like recognize_git_repo, but for SVN repos. Repo status message looks
+    like "on revision 42".
 
     Throws NotARepoException if .svn cannot be found.
     """

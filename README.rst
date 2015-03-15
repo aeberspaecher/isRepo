@@ -1,8 +1,8 @@
 About
 -----
 
-Git/svn repository detection used for awesome shell prompts. The code is
-completely borrowed from Stefan Majewsky:
+Git/svn repository detection used for awesome shell prompts. Parts of the git
+code and all of the SVN code is borrowed from S. Majewsky:
 
 http://majewsky.wordpress.com/2011/09/13/a-clear-sign-of-madness/
 
@@ -26,4 +26,4 @@ This will give you this amazing prompt (with colors, of course)::
 Known issues
 ------------
 
-On very large repositories, this approach is slow.
+On very large repositories, this may be at bit slow-ish.
