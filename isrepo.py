@@ -12,6 +12,7 @@ Used for my custom prompt.
 # Link taken from his blog post at
 # http://majewsky.wordpress.com/2011/09/13/a-clear-sign-of-madness/
 
+import os
 import os.path as op
 import sys
 import subprocess as sp
@@ -159,6 +160,10 @@ def recognize_svn_repo(path):
 
 
 if __name__ == '__main__':
+
+    # reopen stdout for writing with immediate flushing
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+
     try:  # is sys.argv[1] in a git repo?
         path, repopath, status = recognize_git_repo(sys.argv[1])
     except NotARepoException:
@@ -172,3 +177,5 @@ if __name__ == '__main__':
         print("["+ status + "] ")
     else:
         print(status)
+
+    os._exit(0)  # quit without garbage collection
